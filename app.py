@@ -1,512 +1,270 @@
-import tkinter as tk
-from tkinter import messagebox
-from tkinter import ttk
+import streamlit as st
+import json
 import random
 
-def clear_window(root):
-    for widget in root.winfo_children():
-        widget.destroy()
-
-class MainMenu:
-
-    def __init__(self, root):
-
-        self.root = root
-
-        clear_window(root)
-
-        frame = tk.Frame(
-            root,
-            bg="#1e1e2f"
-        )
-        frame.pack(fill="both", expand=True)
-
-        title = tk.Label(
-            frame,
-            text="Выберите режим обучения",
-            font=("Arial", 22, "bold"),
-            bg="#1e1e2f",
-            fg="white"
-        )
-        title.pack(pady=50)
-
-        test_btn = tk.Button(
-            frame,
-            text="📝 Тесты",
-            width=25,
-            height=2,
-            font=("Arial", 14),
-            command=self.start_quiz
-        )
-        test_btn.pack(pady=15)
-
-        match_btn = tk.Button(
-            frame,
-            text="📅 Даты и события",
-            width=25,
-            height=2,
-            font=("Arial", 14),
-            command=self.start_match
-        )
-        match_btn.pack(pady=15)
-
-        
-
-
-
-    def start_quiz(self):
-
-        clear_window(self.root)
-
-        questions = load_questions("questions.json")
-
-        QuizApp(self.root, questions)
-
-    def start_match(self):
-
-        clear_window(self.root)
-
-        with open(
-            "dates.json",
-            "r",
-            encoding="utf-8"
-        ) as f:
-
-            pairs = json.load(f)
-
-        MatchMode(self.root, pairs)
-
-
-class MatchMode:
-
-    def __init__(self, root, pairs):
-
-        self.root = root
-        self.pairs = pairs
-
-        self.batch_size = 10
-        self.offset = 0
-        
-        self.main_frame = tk.Frame(
-            root,
-            bg="#1e1e2f"
-        )
-        self.main_frame.pack(fill="both", expand=True)
-
-        title = tk.Label(
-            self.main_frame,
-            text="Сопоставьте даты и события",
-            font=("Arial", 20, "bold"),
-            bg="#1e1e2f",
-            fg="white"
-        )
-        title.pack(pady=20)
-
-        self.status_label = tk.Label(
-            self.main_frame,
-            text="",
-            font=("Arial", 12),
-            bg="#1e1e2f",
-            fg="white"
-        )
-        self.status_label.pack(pady=5)
-        
-        self.game_frame = tk.Frame(self.main_frame, bg="#1e1e2f")
-        self.game_frame.pack(fill="both", expand=True, padx=20, pady=10)
-        self.game_frame.pack_propagate(False)
-
-        self.content = tk.Frame(self.game_frame, bg="#1e1e2f")
-        self.content.pack(fill="both", expand=True)
-
-
-        self.correct_matches = 0
-        self.total_matches = len(pairs)
-
-        self.selected_date = None
-        self.selected_event = None
-
-        self.date_buttons = {}
-        self.event_buttons = {}
-
-
-        self.build_board()
-
-
-        menu_btn = tk.Button(
-            self.main_frame,
-            text="← В меню",
-            command=self.back_to_menu
-        )
-        menu_btn.pack(anchor="nw", padx=10, pady=10)
-
-
-
-
-    def build_board(self):
-        if hasattr(self, "left_frame"):
-            self.left_frame.destroy()
-
-        if hasattr(self, "right_frame"):
-            self.right_frame.destroy()
-
-        # очищаем старые элементы
-        for widget in self.content.winfo_children():
-            widget.destroy()
-
-        self.left_frame = tk.Frame(self.content, bg="#1e1e2f")
-        self.left_frame.pack(side="left", fill="both", expand=True, padx=30)
-
-        self.right_frame = tk.Frame(self.content, bg="#1e1e2f")
-        self.right_frame.pack(side="right", fill="both", expand=True, padx=30)
-        
-        batch = self.pairs[self.offset:self.offset + self.batch_size]
-
-        dates = batch.copy()
-        events = [x["event"] for x in batch]
-
-        random.shuffle(events)
-
-        self.date_buttons = {}
-        self.event_buttons = {}
-
-        for item in dates:
-            btn = tk.Button(
-                self.left_frame,
-                text=item["date"],
-                font=("Arial", 13),
-                width=28,
-                height=2,
-                wraplength=250,
-                command=lambda d=item["date"]: self.select_date(d)
-            )
-            btn.pack(pady=6)
-            self.date_buttons[item["date"]] = btn
-
-        for event in events:
-            btn = tk.Button(
-                self.right_frame,
-                text=event,
-                font=("Arial", 13),
-                width=45,
-                height=2,
-                wraplength=400,
-                justify="center",
-                command=lambda e=event: self.select_event(e)
-            )
-            btn.pack(pady=6)
-            self.event_buttons[event] = btn
-
-    def select_date(self, date):
-
-        self.selected_date = date
-
-        for btn in self.date_buttons.values():
-            btn.config(bg="SystemButtonFace")
-
-        self.date_buttons[date].config(bg="#6c63ff")
-
-        self.check_match()
-
-    def select_event(self, event):
-
-        self.selected_event = event
-
-        for btn in self.event_buttons.values():
-            btn.config(bg="SystemButtonFace")
-
-        self.event_buttons[event].config(bg="#6c63ff")
-
-        self.check_match()
-
-    def check_match(self):
-
-        if self.selected_date is None:
-            return
-
-        if self.selected_event is None:
-            return
-
-        correct = False
-
-        for pair in self.pairs:
-
-            if (
-                pair["date"] == self.selected_date
-                and pair["event"] == self.selected_event
-            ):
-                correct = True
-                break
-
-        if correct:
-
-            self.date_buttons[self.selected_date].config(
-                bg="green",
-                state="disabled"
-            )
-
-            self.event_buttons[self.selected_event].config(
-                bg="green",
-                state="disabled"
-            )
-
-            self.root.after(
-                500,
-                lambda: self.remove_pair(
-                    self.selected_date,
-                    self.selected_event
-                )
-            )
-
-            self.correct_matches += 1
-
-            if self.correct_matches == len(self.pairs):
-                messagebox.showinfo("Готово", "Все пары найдены!")
-                return
-
-            if self.correct_matches % self.batch_size == 0:
-                self.root.after(800, self.next_batch)
-
-        else:
-
-            self.date_buttons[self.selected_date].config(bg="red")
-            self.event_buttons[self.selected_event].config(bg="red")
-
-            self.root.after(
-                800,
-                lambda: self.reset_colors(
-                    self.selected_date,
-                    self.selected_event
-                )
-            )
-
-        self.selected_date = None
-        self.selected_event = None
-
-    def remove_pair(self, date, event):
-
-        self.date_buttons[date].pack_forget()
-        self.event_buttons[event].pack_forget()
-
-    def reset_colors(self, date, event):
-
-        if date in self.date_buttons:
-            self.date_buttons[date].config(bg="SystemButtonFace")
-
-        if event in self.event_buttons:
-            self.event_buttons[event].config(bg="SystemButtonFace")
-    
-    def back_to_menu(self):
-        clear_window(self.root)
-        MainMenu(self.root)
-    
-    def next_batch(self):
-        self.offset += self.batch_size
-
-        if self.offset >= len(self.pairs):
-            messagebox.showinfo("Готово", "Вы прошли все блоки!")
-            return
-
-        self.build_board()
-
-class QuizApp:
-    def __init__(self, root, questions):
-        self.root = root
-        self.root.title("Quiz App")
-        self.root.geometry("800x500")
-        self.root.configure(bg="#1e1e2f")
-
-        self.questions = questions
-        self.current_question = 0
-        self.score = 0
-
-        # Прогресс
-        self.progress_label = tk.Label(
-            root,
-            text="",
-            font=("Arial", 11),
-            bg="#1e1e2f",
-            fg="white"
-        )
-        self.progress_label.pack(pady=(10, 0))
-
-        self.progress = ttk.Progressbar(
-            root,
-            length=600,
-            mode="determinate"
-        )
-        self.progress.pack(pady=(5, 15))
-
-        self.progress["maximum"] = len(self.questions)
-
-
-
-        # 🎯 КАРТОЧКА ВОПРОСА
-        self.card = tk.Frame(
-            root,
-            bg="#2a2a40",
-            padx=20,
-            pady=20
-        )
-        self.card.pack(pady=30, fill="x", padx=50)
-
-        self.question_label = tk.Label(
-            self.card,
-            text="",
-            font=("Arial", 18, "bold"),
-            bg="#2a2a40",
-            fg="white",
-            wraplength=700,
-            justify="center"
-        )
-        self.question_label.pack()
-
-        self.result_label = tk.Label(
-            self.card,
-            text="",
-            font=("Arial", 12, "bold"),
-            bg="#2a2a40",
-            fg="white"
-        )
-        self.result_label.pack(pady=10)
-
-        # 🎯 КНОПКИ ОТВЕТОВ
-        self.answer_buttons = []
-        self.MAX_ANSWERS = 5
-
-        self.btn_frame = tk.Frame(root, bg="#1e1e2f")
-        self.btn_frame.pack(pady=10)
-
-        for i in range(self.MAX_ANSWERS):
-            btn = tk.Button(
-                self.btn_frame,
-                text="",
-                width=70,
-                height=3,
-                wraplength=700,
-                justify="center",
-                font=("Arial", 12),
-                bg="#3b3b5c",
-                fg="white",
-                activebackground="#6c63ff",
-                activeforeground="white",
-                bd=0,
-                command=lambda idx=i: self.check_answer(idx)
-            )
-            btn.pack(pady=5)
-
-            # hover эффект
-            btn.bind("<Enter>", lambda e, b=btn: b.config(bg="#5757a3"))
-            btn.bind("<Leave>", lambda e, b=btn: b.config(bg="#3b3b5c"))
-
-            self.answer_buttons.append(btn)
-
-        menu_btn = tk.Button(
-            root,
-            text="← В меню",
-            command=self.back_to_menu
-        )
-        menu_btn.pack(anchor="nw", padx=10, pady=10)
-
-        # запуск
-        self.root.after(100, self.load_question)
-
-    def load_question(self):
-        if self.current_question >= len(self.questions):
-           
-           # заполняем прогресс-бар на 100%
-            self.progress["value"] = len(self.questions)
-            
-            messagebox.showinfo(
-                "Готово",
-                f"Результат: {self.score}/{len(self.questions)}"
-            )
-            self.root.quit()
-            return
-
-        q = self.questions[self.current_question]
-
-        self.progress["value"] = self.current_question
-
-        remaining = len(self.questions) - self.current_question
-
-        self.progress_label.config(
-            text=f"Вопрос {self.current_question + 1} из {len(self.questions)} | Осталось: {remaining}"
-        )
-
-        self.question_label.config(
-            text=f"Вопрос {self.current_question + 1}/{len(self.questions)}\n\n{q['question']}"
-        )
-
-        self.root.update_idletasks()
-
-        self.result_label.config(text="")
-
-        answers = q["answers"]
-
-        for i, btn in enumerate(self.answer_buttons):
-            if i < len(answers):
-                btn.config(
-                    text=answers[i],
-                    state="normal",
-                    bg="#3b3b5c"
-                )
-                btn.pack(pady=5)
-            else:
-                btn.pack_forget()
-
-    def back_to_menu(self):
-        clear_window(self.root)
-        MainMenu(self.root)
-
-    def check_answer(self, selected_index):
-        q = self.questions[self.current_question]
-
-        correct_index = q["correct"]
-        correct_text = q["answers"][correct_index]
-
-        # блокируем кнопки
-        for btn in self.answer_buttons:
-            btn.config(state="disabled")
-
-        # подсветка правильного ответа
-        self.answer_buttons[correct_index].config(bg="green")
-
-        if selected_index == correct_index:
-            self.score += 1
-
-            self.result_label.config(
-                text="✅ Верно!",
-                fg="#4CAF50"
-            )
-        else:
-            self.answer_buttons[selected_index].config(bg="red")
-
-            self.result_label.config(
-                text=f"❌ Неверно\nПравильный ответ: {correct_text}",
-                fg="#FF6B6B"
-            )
-
-        self.current_question += 1
-
-        # задержка 2 секунды
-        self.root.after(2000, self.load_question)
-
-    def flash_result(self, color):
-        original = self.question_label.cget("bg")
-
-        self.question_label.config(bg=color)
-        self.root.after(200, lambda: self.question_label.config(bg=original))
-
-import json
-
-def load_questions(filename):
+# -------------------- Загрузка данных --------------------
+@st.cache_data
+def load_questions(filename="questions.json"):
+    """Загружает список вопросов из JSON."""
     with open(filename, "r", encoding="utf-8") as f:
         return json.load(f)
 
+@st.cache_data
+def load_dates(filename="dates.json"):
+    """Загружает пары дата-событие из JSON."""
+    with open(filename, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+# -------------------- Инициализация сессии --------------------
+if "page" not in st.session_state:
+    st.session_state.page = "menu"
+
+# -------------------- Основное меню --------------------
+def show_menu():
+    st.title("Выберите режим обучения")
+    col1, col2, _ = st.columns([1, 1, 2])
+    with col1:
+        if st.button("📝 Тесты", use_container_width=True):
+            st.session_state.page = "quiz"
+            # Инициализация состояния для тестов
+            st.session_state.quiz = {
+                "questions": load_questions(),
+                "current": 0,
+                "score": 0,
+                "answered": False,       # Был ли дан ответ на текущий вопрос
+                "selected": None,        # Индекс выбранного ответа
+                "feedback": None         # "correct" / "wrong"
+            }
+            st.rerun()
+    with col2:
+        if st.button("📅 Даты и события", use_container_width=True):
+            st.session_state.page = "match"
+            # Инициализация состояния для игры в даты
+            pairs = load_dates()
+            st.session_state.match = {
+                "pairs": pairs,
+                "offset": 0,
+                "batch_size": 10,
+                "selected_date": None,
+                "selected_event": None,
+                "matched": {},           # ключ: дата, значение: событие (только правильные)
+                "wrong_pair": None       # временная подсветка ошибки
+            }
+            st.rerun()
+
+# -------------------- Режим тестов --------------------
+def show_quiz():
+    quiz = st.session_state.quiz
+    questions = quiz["questions"]
+    total = len(questions)
+
+    # Если все вопросы пройдены — показать результат
+    if quiz["current"] >= total:
+        st.success(f"🎉 Тест завершён! Ваш результат: {quiz['score']}/{total}")
+        if st.button("← Вернуться в меню"):
+            st.session_state.page = "menu"
+            st.rerun()
+        return
+
+    # Текущий вопрос
+    q = questions[quiz["current"]]
+    progress = quiz["current"]
+    st.progress(progress / total, text=f"Вопрос {progress+1} из {total}")
+
+    st.subheader(q["question"])
+
+    answers = q["answers"]
+    correct_idx = q["correct"]
+
+    # Если ответ ещё не дан — показываем активные кнопки
+    if not quiz["answered"]:
+        # Создаём кнопки для каждого варианта
+        cols = st.columns(1)
+        for i, ans in enumerate(answers):
+            if cols[0].button(ans, key=f"ans_{i}", use_container_width=True):
+                quiz["answered"] = True
+                quiz["selected"] = i
+                if i == correct_idx:
+                    quiz["score"] += 1
+                    quiz["feedback"] = "correct"
+                else:
+                    quiz["feedback"] = "wrong"
+                st.rerun()
+
+    # Если ответ дан — показываем обратную связь
+    else:
+        selected = quiz["selected"]
+        # Подсветка: правильный ответ всегда зелёный, неправильный выбор — красный
+        for i, ans in enumerate(answers):
+            if i == correct_idx:
+                st.markdown(f"✅ **{ans}**")  # правильный ответ
+            elif i == selected and selected != correct_idx:
+                st.markdown(f"❌ ~~{ans}~~")  # ошибочный выбор
+            else:
+                st.markdown(ans)
+
+        # Текст обратной связи
+        if quiz["feedback"] == "correct":
+            st.success("Верно!")
+        else:
+            st.error(f"Неверно. Правильный ответ: **{answers[correct_idx]}**")
+
+        # Кнопка "Далее"
+        if st.button("Следующий вопрос ➡️"):
+            quiz["current"] += 1
+            quiz["answered"] = False
+            quiz["selected"] = None
+            quiz["feedback"] = None
+            st.rerun()
+
+    # Кнопка возврата в меню (всегда доступна)
+    st.divider()
+    if st.button("← В меню"):
+        st.session_state.page = "menu"
+        st.rerun()
+
+# -------------------- Режим сопоставления дат --------------------
+def show_match():
+    match = st.session_state.match
+    pairs = match["pairs"]
+    offset = match["offset"]
+    batch_size = match["batch_size"]
+
+    # Если все пары разгаданы
+    if offset >= len(pairs):
+        st.balloons()
+        st.success("🎉 Все пары найдены! Поздравляем!")
+        if st.button("← Вернуться в меню"):
+            st.session_state.page = "menu"
+            st.rerun()
+        return
+
+    # Текущая партия
+    batch = pairs[offset:offset + batch_size]
+    if not batch:
+        # На случай пустой партии — завершаем
+        st.success("Вы прошли все блоки!")
+        if st.button("← Вернуться в меню"):
+            st.session_state.page = "menu"
+            st.rerun()
+        return
+
+    st.title("Сопоставьте даты и события")
+    st.caption(f"Блок {offset // batch_size + 1}. Найдите пары дата ↔ событие")
+
+    # Подготовка данных
+    dates = [item["date"] for item in batch]
+    events_original = [item["event"] for item in batch]
+    # Перемешиваем события на правой стороне
+    shuffled_events = events_original.copy()
+    random.shuffle(shuffled_events)
+
+    # Создаём две колонки
+    col_left, col_right = st.columns(2)
+
+    with col_left:
+        st.subheader("Даты")
+        for date in dates:
+            # Если дата уже сопоставлена — показываем неактивной (зелёной) кнопкой
+            if match["matched"].get(date):
+                st.button(f"✅ {date}", key=f"d_{date}", disabled=True, use_container_width=True)
+            else:
+                # Активная кнопка для выбора
+                if st.button(date, key=f"d_{date}", use_container_width=True):
+                    match["selected_date"] = date
+                    # Сброс ошибочной подсветки при новом выборе
+                    match["wrong_pair"] = None
+                    # Проверяем, если уже выбрано событие, то сразу проверяем пару
+                    if match["selected_event"] is not None:
+                        check_match()
+                    st.rerun()
+
+    with col_right:
+        st.subheader("События")
+        for event in shuffled_events:
+            # Если событие уже сопоставлено — неактивная кнопка
+            already_matched = event in match["matched"].values()
+            if already_matched:
+                st.button(f"✅ {event}", key=f"e_{event}", disabled=True, use_container_width=True)
+            else:
+                if st.button(event, key=f"e_{event}", use_container_width=True):
+                    match["selected_event"] = event
+                    match["wrong_pair"] = None
+                    if match["selected_date"] is not None:
+                        check_match()
+                    st.rerun()
+
+    # Отображение выбранных элементов (для ясности)
+    if match["selected_date"] or match["selected_event"]:
+        st.caption(f"Выбрано: **{match['selected_date'] or '...'}** ↔ **{match['selected_event'] or '...'}**")
+
+    # Обработка неправильной пары (визуальная подсветка)
+    if match["wrong_pair"]:
+        wrong_date, wrong_event = match["wrong_pair"]
+        st.error(f"❌ Неверная пара: {wrong_date} ↔ {wrong_event}")
+        # Автоматически сбрасываем подсветку при следующем действии (уже реализовано в кнопках)
+
+    # Кнопка для сброса выбора
+    if st.button("Сбросить выбор"):
+        match["selected_date"] = None
+        match["selected_event"] = None
+        match["wrong_pair"] = None
+        st.rerun()
+
+    # Возврат в меню
+    st.divider()
+    if st.button("← В меню"):
+        st.session_state.page = "menu"
+        st.rerun()
+
+def check_match():
+    """Проверяет выбранную пару дата-событие и обновляет состояние игры."""
+    match = st.session_state.match
+    date = match["selected_date"]
+    event = match["selected_event"]
+    if not date or not event:
+        return
+
+    # Проверка соответствия по исходным данным
+    correct = False
+    for pair in match["pairs"]:
+        if pair["date"] == date and pair["event"] == event:
+            correct = True
+            break
+
+    if correct:
+        # Запоминаем правильную пару
+        match["matched"][date] = event
+        # Сбрасываем выделение
+        match["selected_date"] = None
+        match["selected_event"] = None
+        match["wrong_pair"] = None
+
+        # Проверяем, закончился ли текущий блок
+        batch = match["pairs"][match["offset"]:match["offset"] + match["batch_size"]]
+        all_matched = all(pair["date"] in match["matched"] for pair in batch)
+        if all_matched:
+            # Переход к следующему блоку (после rerun отобразится новый блок)
+            match["offset"] += match["batch_size"]
+    else:
+        # Неправильная пара: запоминаем для сообщения об ошибке
+        match["wrong_pair"] = (date, event)
+        # Выделение сбрасывать не будем, чтобы пользователь видел, что выбрано;
+        # при следующем клике по любой кнопке wrong_pair обнулится.
+
+# -------------------- Главная логика --------------------
+def main():
+    st.set_page_config(page_title="Обучение", layout="wide")
+
+    # Выбор страницы на основе session_state
+    if st.session_state.page == "menu":
+        show_menu()
+    elif st.session_state.page == "quiz":
+        show_quiz()
+    elif st.session_state.page == "match":
+        show_match()
+    else:
+        show_menu()
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    
-    MainMenu(root)
-
-    root.mainloop()
+    main()
